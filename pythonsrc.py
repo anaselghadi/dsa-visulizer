@@ -1,5 +1,6 @@
 from enum import Enum
 import random
+from flask import Flask, jsonify, render_template 
 class CellState(Enum):
     PATH = 0
     WALL = 1
@@ -33,11 +34,11 @@ class Maze :
 
     
     def set_cell_state(self, row:int,col:int,state:CellState)-> None:
+        if(row<0 or row>=self.width or col<0 or col>=self.length) :
+            raise IndexError("Cell position out of bounds")
         if(self._grid[row][col]==CellState.START or self._grid[row][col]==CellState.END):
             raise ValueError("Cannot change the state of start or end cell")    
         
-        if(row<0 or row>=self.width or col<0 or col>=self.length) :
-            raise IndexError("Cell position out of bounds")
 
         self._grid[row][col] = state
             
@@ -56,6 +57,7 @@ class Maze :
             raise ValueError("Cannot move terminal to a wall cell")
         self._grid[old_row][old_col] = CellState.PATH
         self._grid[new_row][new_col] = terminal
+        
     @property
     def grid(self):
         return self._grid
@@ -73,12 +75,35 @@ class Maze :
             maze_str += "".join([symbol_map[cell] for cell in row]) + "\n"
 
         return maze_str
+    
+    
+#*** FLASK APPLICATION INITIALIZATION***
+app = Flask(__name__)
+Maze_instance = Maze(15, 15)
+Maze_instance.generate_random_walls(0.3)
+
+# ***FLASK ROUTES (The API and Frontend Pages)***
+@app.route("/")
+def index():
+    return render_template('index.html')
+
+@app.route('/api/get_maze')
+def get_maze_data():
+    grid_values = [
+        [cell.value for cell in row] 
+        for row in Maze_instance.grid
+    ]
+    
+    # Return a JSON object
+    return jsonify({
+        'grid': grid_values,
+        'width': Maze_instance.width,
+        'length': Maze_instance.length,
+        'start': Maze_instance.start_pos,
+        'end': Maze_instance.end_pos
+    })
 
 if __name__ == "__main__":
-    maze = Maze(5,5)   
-    print(maze)
-    # for i, row in enumerate(maze.grid):
-       
-    #     for cell in row:
-    #         print(f"{cell.value} ", end="")
-    #     print()
+    app.run(debug=True)
+
+  
