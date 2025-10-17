@@ -1,0 +1,27 @@
+/* static/style.css */
+:root {
+    --maze-cols: 15;
+    --cell-size: 30px; 
+}
+
+#maze-container {
+    display: grid;
+    /* Use the variable to define the column count */
+    grid-template-columns: repeat(var(--maze-cols), var(--cell-size));
+    width: fit-content;
+    margin: 20px auto; /* Center the grid */
+}
+
+.cell {
+    width: var(--cell-size);
+    height: var(--cell-size);
+    /* Simple border to distinguish cells, or remove for clean look */
+    border: 1px solid #ddd;
+    box-sizing: border-box;
+}
+
+/* Color Classes (Match the look you want!) */
+.path { background-color: #eee; }
+.wall { background-color: #333; }
+.start { background-color: green; }
+.end { background-color: red; }
