@@ -94,7 +94,7 @@ class Maze:
     def grid(self):
         return self._grid
 
-#*** FLASK APPLICATION INITIALIZATION ***
+# *** FLASK APPLICATION INITIALIZATION ***
 app = Flask(__name__)
 # Create a 20x20 maze for a better visual experience
 Maze_instance = Maze(20, 20)
@@ -102,6 +102,8 @@ Maze_instance.generate_random_walls(0.3)
 
 @app.route("/")
 def index():
+    # Adding this line ensures a refresh also makes a new maze
+    Maze_instance.generate_random_walls(0.3)
     return render_template('index.html')
 
 @app.route('/api/get_maze')
@@ -114,6 +116,12 @@ def get_maze_data():
         'start': Maze_instance.start_pos,
         'end': Maze_instance.end_pos
     })
+
+@app.route('/api/regenerate', methods=['POST'])
+def regenerate_maze():
+    """Tells the maze instance to shuffle its walls."""
+    Maze_instance.generate_random_walls(0.3)
+    return jsonify({'status': 'success'})
 
 @app.route('/api/solve')
 def solve_maze():
