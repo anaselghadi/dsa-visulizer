@@ -8,7 +8,9 @@ const CELL_STATE_MAP = {
 const mazeContainer = document.getElementById('maze-container');
 const statusText = document.getElementById('maze-status');
 
-// Function to fetch and render the maze
+/**
+ * Fetches the current maze state from the server and renders the grid.
+ */
 async function loadMaze() {
     statusText.innerText = "Loading...";
     try {
@@ -27,6 +29,9 @@ async function loadMaze() {
     }
 }
 
+/**
+ * Creates the div elements representing each cell in the maze.
+ */
 function renderGrid(data) {
     mazeContainer.innerHTML = '';
     const { grid, width, length } = data;
@@ -42,18 +47,19 @@ function renderGrid(data) {
     }
 }
 
-// Function to handle the "New Maze" button without refreshing the page
+/**
+ * Triggers a maze regeneration on the server and reloads the UI.
+ */
 async function handleRegenerate() {
     statusText.innerText = "Generating...";
     try {
-        // We tell the server to shuffle the walls
+        // Clear existing visuals immediately for responsiveness
+        const cells = document.querySelectorAll('.visited, .solution');
+        cells.forEach(cell => {
+            cell.classList.remove('visited', 'solution');
+        });
+
         await fetch('/api/regenerate', { method: 'POST' });
-        
-        // Clear any remaining solution classes before re-loading
-        const cells = document.querySelectorAll('.solution');
-        cells.forEach(cell => cell.classList.remove('solution'));
-        
-        // After server is done, we simply reload the maze data
         await loadMaze();
     } catch (err) {
         statusText.innerText = "Error regenerating";
@@ -61,36 +67,58 @@ async function handleRegenerate() {
     }
 }
 
-// Function to fetch the solution and animate it
+/**
+ * Fetches the solution and animates both exploration (yellow) and path (cyan).
+ */
 async function solveMaze() {
-    statusText.innerText = "Solving...";
+    statusText.innerText = "Exploring...";
     try {
         const response = await fetch('/api/solve');
         const data = await response.json();
-        const path = data.path;
+        const { path, visited } = data;
 
-        if (path.length === 0) {
+        // Clear previous solve attempts
+        const oldSolve = document.querySelectorAll('.visited, .solution');
+        oldSolve.forEach(c => c.classList.remove('visited', 'solution'));
+
+        // 1. Animate Exploration (Visited Cells in Yellow)
+        for (let i = 0; i < visited.length; i++) {
+            const [r, c] = visited[i];
+            const cell = document.getElementById(`cell-${r}-${c}`);
+            
+            if (cell && !cell.classList.contains('start') && !cell.classList.contains('end')) {
+                cell.classList.add('visited');
+                // Short delay to see the BFS expansion effect
+                await new Promise(resolve => setTimeout(resolve, 5));
+            }
+        }
+
+        if (!path || path.length === 0) {
             statusText.innerText = "No Path Found!";
             return;
         }
 
-        path.forEach((coords, index) => {
-            setTimeout(() => {
-                const [r, c] = coords;
-                const cell = document.getElementById(`cell-${r}-${c}`);
-                if (!cell.classList.contains('start') && !cell.classList.contains('end')) {
-                    cell.classList.add('solution');
-                }
-                if (index === path.length - 1) statusText.innerText = "Solved!";
-            }, index * 20);
-        });
+        // 2. Animate Final Path (Solution in Cyan)
+        statusText.innerText = "Path Found!";
+        for (let i = 0; i < path.length; i++) {
+            const [r, c] = path[i];
+            const cell = document.getElementById(`cell-${r}-${c}`);
+            
+            if (cell && !cell.classList.contains('start') && !cell.classList.contains('end')) {
+                cell.classList.remove('visited');
+                cell.classList.add('solution');
+                // Slower delay to make the final path stand out
+                await new Promise(resolve => setTimeout(resolve, 25));
+            }
+        }
+        statusText.innerText = "Solved!";
     } catch (err) {
         statusText.innerText = "Solver Error";
         console.error(err);
     }
 }
 
-// Updated Event Listeners
+// Event Listeners
 document.getElementById('regenerate-btn').addEventListener('click', handleRegenerate);
 document.getElementById('solve-btn').addEventListener('click', solveMaze);
 

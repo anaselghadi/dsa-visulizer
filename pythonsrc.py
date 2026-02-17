@@ -20,6 +20,7 @@ class Maze:
         self._grid[width-1][length-1] = CellState.END
 
     def generate_random_walls(self, wall_probability:float) -> None:
+        """Randomizes walls while keeping Start and End clear."""
         if not (0 <= wall_probability <= 1):
             raise ValueError("Wall probability must be between 0 and 1")
         for i in range(self.width):
@@ -42,53 +43,47 @@ class Maze:
             raise ValueError("Cannot change the state of start or end cell")    
         self._grid[row][col] = state
             
-    def move_terminal(self, new_row:int, new_col:int, terminal:CellState) -> None:
-        if(terminal != CellState.START and terminal != CellState.END):
-            raise ValueError("Terminal must be either start or end")
-        if(new_row < 0 or new_row >= self.width or new_col < 0 or new_col >= self.length):
-            raise IndexError("New position out of bounds")
-        
-        if(terminal == CellState.START):
-            old_row, old_col = self.start_pos
-            self.start_pos = (new_row, new_col)
-        else:
-            old_row, old_col = self.end_pos
-            self.end_pos = (new_row, new_col)
-            
-        if(self._grid[new_row][new_col] == CellState.WALL):
-            raise ValueError("Cannot move terminal to a wall cell")
-            
-        self._grid[old_row][old_col] = CellState.PATH
-        self._grid[new_row][new_col] = terminal
-
-    def solve_bfs(self) -> list[tuple[int, int]]:
+    def solve_bfs(self) -> tuple[list[tuple[int, int]], list[tuple[int, int]]]:
+        """
+        Finds the shortest path and the order of exploration.
+        Returns: (path, visited_order)
+        """
         start_row, start_col = self.start_pos
-        end_row, end_col = self.end_pos
         queue = deque([(start_row, start_col)])
-        visited = {self.start_pos}
+        
+        # Track the order of exploration for the yellow animation
+        visited_order = [] 
+        visited_set = {self.start_pos}
+        
+        # Dictionary for path reconstruction: child -> parent
         parents = {self.start_pos: None} 
         directions = [(0, 1), (0, -1), (1, 0), (-1, 0)]
 
         while queue:
             curr_row, curr_col = queue.popleft()
+            visited_order.append((curr_row, curr_col))
+
+            # Target reached
             if (curr_row, curr_col) == self.end_pos:
                 path = []
                 current = self.end_pos
                 while current is not None:
                     path.append(current)
                     current = parents[current]
-                return path[::-1]
+                return path[::-1], visited_order
 
             for dr, dc in directions:
                 next_row, next_col = curr_row + dr, curr_col + dc
                 next_pos = (next_row, next_col)
+
                 if (0 <= next_row < self.width and 0 <= next_col < self.length and 
                     self._grid[next_row][next_col] != CellState.WALL and 
-                    next_pos not in visited):
-                    visited.add(next_pos)
+                    next_pos not in visited_set):
+                    visited_set.add(next_pos)
                     parents[next_pos] = (curr_row, curr_col)
                     queue.append(next_pos)
-        return []
+        
+        return [], visited_order
 
     @property
     def grid(self):
@@ -96,18 +91,20 @@ class Maze:
 
 # *** FLASK APPLICATION INITIALIZATION ***
 app = Flask(__name__)
-# Create a 20x20 maze for a better visual experience
+
+# Initialize a standard 20x20 maze
 Maze_instance = Maze(20, 20)
 Maze_instance.generate_random_walls(0.3)
 
 @app.route("/")
 def index():
-    # Adding this line ensures a refresh also makes a new maze
+    # Force a new maze layout on every full page refresh
     Maze_instance.generate_random_walls(0.3)
     return render_template('index.html')
 
 @app.route('/api/get_maze')
 def get_maze_data():
+    """Returns the current grid state to the frontend."""
     grid_values = [[cell.value for cell in row] for row in Maze_instance.grid]
     return jsonify({
         'grid': grid_values,
@@ -119,14 +116,18 @@ def get_maze_data():
 
 @app.route('/api/regenerate', methods=['POST'])
 def regenerate_maze():
-    """Tells the maze instance to shuffle its walls."""
+    """Triggered by the 'New Maze' button for a smooth update."""
     Maze_instance.generate_random_walls(0.3)
     return jsonify({'status': 'success'})
 
 @app.route('/api/solve')
 def solve_maze():
-    path = Maze_instance.solve_bfs()
-    return jsonify({'path': path})
+    """Returns both the shortest path and the order of exploration."""
+    path, visited = Maze_instance.solve_bfs()
+    return jsonify({
+        'path': path, 
+        'visited': visited
+    })
 
 if __name__ == "__main__":
     app.run(debug=True)
